@@ -1,0 +1,16 @@
+[
+  {
+    "id": "1779798717406",
+    "name": "Jyoti",
+    "email": "jyotidesai18@gmail.com",
+    "password": "$2a$10$9dWuOvwkdSf2gd9mx7sgIuvroyTgkpWOf3nwgWbrWEVhx1a/ojYpq",
+    "createdAt": "2026-05-26T12:31:57.406Z"
+  },
+  {
+    "id": "1780394667732",
+    "name": "Jyoti1",
+    "email": "jyoti_dsd@hotmail.com",
+    "password": "$2a$10$64ilwL.HjDYMsRYi0CGgMOxd81ISgaFeDBUTu9B4HtNjlNXJxZXMu",
+    "createdAt": "2026-06-02T10:04:27.733Z"
+  }
+]
