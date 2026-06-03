@@ -117,4 +117,14 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`SAP BTP Portal API running on http://localhost:${PORT}`);
   console.log('Routes: POST /api/register | POST /api/login | GET /api/verify');
+
+  // Keep Render free tier alive by self-pinging every 4 minutes
+  const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
+  if (RENDER_URL) {
+    setInterval(() => {
+      fetch(`${RENDER_URL}/api/health`)
+        .then(() => console.log('Keep-alive ping sent'))
+        .catch(() => {});
+    }, 4 * 60 * 1000);
+  }
 });
