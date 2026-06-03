@@ -8,6 +8,9 @@
 let progress   = {};
 let doChecks   = {};
 let practicedQ = {};
+let bookmarks  = [];
+let notes      = {};
+let streak     = 1;
 
 let curUnitIdx   = 0;
 let curLessonIdx = 0;
@@ -20,6 +23,8 @@ function loadState() {
   try { progress   = JSON.parse(localStorage.getItem('btp_progress')  || '{}'); } catch(e) { progress = {}; }
   try { doChecks   = JSON.parse(localStorage.getItem('btp_dochecks')  || '{}'); } catch(e) { doChecks = {}; }
   try { practicedQ = JSON.parse(localStorage.getItem('btp_practiced') || '{}'); } catch(e) { practicedQ = {}; }
+  try { bookmarks  = JSON.parse(localStorage.getItem('btp_bookmarks') || '[]'); } catch(e) { bookmarks = []; }
+  try { notes      = JSON.parse(localStorage.getItem('btp_notes')     || '{}'); } catch(e) { notes = {}; }
   if (progress['u2l2'] === undefined) progress['u2l2'] = true;
   const btn = document.getElementById('themeToggle');
   if (btn) btn.textContent = localStorage.getItem('btp_theme') === 'light' ? '☀️' : '🌙';
@@ -47,7 +52,7 @@ function syncProgressToServer() {
   fetch(`${getApiUrl()}/api/progress`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ progress, doChecks, practicedQ })
+    body: JSON.stringify({ progress, doChecks, practicedQ, bookmarks, notes })
   }).catch(() => {});
 }
 
@@ -63,15 +68,51 @@ async function loadProgressFromServer() {
     if (data.progress)   { progress   = data.progress;   localStorage.setItem('btp_progress',  JSON.stringify(progress)); }
     if (data.doChecks)   { doChecks   = data.doChecks;   localStorage.setItem('btp_dochecks',  JSON.stringify(doChecks)); }
     if (data.practicedQ) { practicedQ = data.practicedQ; localStorage.setItem('btp_practiced', JSON.stringify(practicedQ)); }
+    if (data.bookmarks)  { bookmarks  = data.bookmarks;  localStorage.setItem('btp_bookmarks', JSON.stringify(bookmarks)); }
+    if (data.notes)      { notes      = data.notes;      localStorage.setItem('btp_notes',     JSON.stringify(notes)); }
+    if (data.streak)     { streak     = data.streak; }
     render();
     renderInterviewSection();
+    renderStreakBadge();
   } catch(e) {}
 }
 
+function saveBookmarks() {
+  localStorage.setItem('btp_bookmarks', JSON.stringify(bookmarks));
+  syncProgressToServer();
+}
+
+function saveNotes() {
+  localStorage.setItem('btp_notes', JSON.stringify(notes));
+  syncProgressToServer();
+}
+
+function toggleBookmark(lessonId) {
+  const idx = bookmarks.indexOf(lessonId);
+  if (idx === -1) bookmarks.push(lessonId);
+  else bookmarks.splice(idx, 1);
+  saveBookmarks();
+  updateBookmarkButton();
+  renderSidebar();
+}
+
+function updateBookmarkButton() {
+  const btn = document.getElementById('bookmarkBtn');
+  if (!btn || !curLesson) return;
+  const isBookmarked = bookmarks.includes(curLesson.id);
+  btn.textContent = isBookmarked ? '🔖 Bookmarked' : '🔖 Bookmark';
+  btn.classList.toggle('bookmarked', isBookmarked);
+}
+
+function renderStreakBadge() {
+  const el = document.getElementById('streakBadge');
+  if (el) el.textContent = `🔥 ${streak} day${streak !== 1 ? 's' : ''}`;
+}
+
 function resetAll() {
-  if (!confirm('Reset all progress?')) return;
-  progress = {}; doChecks = {}; practicedQ = {};
-  saveProgress(); saveDoChecks(); savePracticed();
+  if (!confirm('Reset all progress? This will also clear bookmarks and notes.')) return;
+  progress = {}; doChecks = {}; practicedQ = {}; bookmarks = []; notes = {};
+  saveProgress(); saveDoChecks(); savePracticed(); saveBookmarks(); saveNotes();
   localStorage.removeItem('btp_last_lesson');
   showDashboard();
   render();
@@ -192,7 +233,22 @@ function renderTracker() {
 function renderSidebar() {
   const el = document.getElementById('sidebarNav');
   if (!el) return;
-  el.innerHTML = ALL_UNITS.map((unit, ui) => {
+
+  // Bookmarks section
+  let bookmarksHtml = '';
+  if (bookmarks.length > 0) {
+    const bmLessons = allLessons().filter(l => bookmarks.includes(l.id));
+    bookmarksHtml = `
+      <div class="sb-section-label" style="margin-top:16px">🔖 Bookmarks</div>
+      ${bmLessons.map(l => `
+        <div class="sb-lesson-item" onclick="openLesson(${l.unitIdx},${l.lessonIdx})" style="padding-left:12px">
+          <div class="sb-lesson-dot" style="background:#F4C542"></div>
+          <span style="overflow:hidden;text-overflow:ellipsis;font-size:12px">${l.title}</span>
+        </div>`).join('')}
+      <div class="sb-section-label" style="margin-top:16px">Course Units</div>`;
+  }
+
+  el.innerHTML = bookmarksHtml + ALL_UNITS.map((unit, ui) => {
     const p = unitProgress(unit);
     const isExpanded = unit.lessons.some((l, li) => ui === curUnitIdx);
 
@@ -326,6 +382,7 @@ function openLesson(unitIdx, lessonIdx) {
 
   showLesson();
   updateMarkButton();
+  updateBookmarkButton();
   updateNavButtons();
   switchTab('learn');
   renderSidebar();
@@ -379,14 +436,40 @@ function toggleLessonDone() {
 /* ── TAB SWITCHING ───────────────────────────────────────────── */
 function switchTab(tabName) {
   curTab = tabName;
-  ['learn','seeit','doit','recap'].forEach(t => {
-    document.getElementById('tab-' + t).classList.toggle('active', t === tabName);
-    document.getElementById('tp-'  + t).classList.toggle('active', t === tabName);
+  ['learn','seeit','doit','recap','notes'].forEach(t => {
+    const tab = document.getElementById('tab-' + t);
+    const panel = document.getElementById('tp-' + t);
+    if (tab)   tab.classList.toggle('active', t === tabName);
+    if (panel) panel.classList.toggle('active', t === tabName);
   });
   if (tabName === 'learn')  renderLearnTab();
   if (tabName === 'seeit')  renderSeeItTab();
   if (tabName === 'doit')   renderDoItTab();
   if (tabName === 'recap')  renderRecapTab();
+  if (tabName === 'notes')  renderNotesTab();
+}
+
+function renderNotesTab() {
+  const el = document.getElementById('notesContent');
+  if (!el || !curLesson) return;
+  const saved = notes[curLesson.id] || '';
+  el.innerHTML = `
+    <div style="padding:16px 0">
+      <div style="font-size:13px;color:var(--text3);margin-bottom:10px">Your personal notes for this lesson — saved automatically.</div>
+      <textarea id="notesTextarea"
+        style="width:100%;min-height:220px;padding:14px;border-radius:10px;border:1px solid var(--border);
+               background:var(--bg2);color:var(--text1);font-size:14px;line-height:1.6;resize:vertical;outline:none;box-sizing:border-box"
+        placeholder="Type your notes here…"
+        oninput="saveNoteForLesson()">${saved}</textarea>
+    </div>`;
+}
+
+function saveNoteForLesson() {
+  if (!curLesson) return;
+  const ta = document.getElementById('notesTextarea');
+  if (!ta) return;
+  notes[curLesson.id] = ta.value;
+  saveNotes();
 }
 
 /* ── TAB RENDERERS ───────────────────────────────────────────── */
@@ -721,6 +804,7 @@ window.initApp = function(userName) {
   loadState();
   render();
   renderInterviewSection();
+  renderStreakBadge();
   loadProgressFromServer();
   if (!localStorage.getItem('btp_guide_seen')) {
     setTimeout(() => showGuide(true), 800);

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SAP BTP Mastery</title>
+  <meta name="description" content="Master SAP BTP layer by layer — 8 units, 25 lessons. Built for .NET/Angular developers becoming BTP Technical Architects."/>
+  <meta property="og:title" content="SAP BTP Mastery"/>
+  <meta property="og:description" content="Master SAP BTP layer by layer. Built for .NET/Angular developers becoming BTP architects."/>
+  <meta property="og:type" content="website"/>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23F4C542'/><text x='50%25' y='55%25' dominant-baseline='central' text-anchor='middle' font-family='Arial' font-weight='700' font-size='12' fill='white'>BTP</text></svg>"/>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#F4C542"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="BTP Mastery"/>
+  <link rel="apple-touch-icon" href="icons/icon-192.svg"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/style.css"/>
+  <style>
+    /* ── AUTH MODAL ─────────────────────────────────────────── */
+    #auth-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(10,12,20,.92);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .auth-modal {
+      background: var(--card-bg, #1a1d2e);
+      border: 1px solid var(--border, #2a2d3e);
+      border-radius: 16px;
+      padding: 40px 36px;
+      width: 100%; max-width: 400px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.5);
+    }
+    .auth-logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px; font-weight: 800;
+      color: var(--text1, #e8edf8);
+      margin-bottom: 4px;
+    }
+    .auth-logo span { color: #F4C542; }
+    .auth-tagline { font-size: 13px; color: var(--text3, #8892a4); margin-bottom: 24px; }
+    .auth-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+    .auth-tab {
+      flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border, #2a2d3e);
+      background: transparent; color: var(--text2, #b0bac8);
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s;
+    }
+    .auth-tab.active { background: #F4C542; color: #111; border-color: #F4C542; }
+    .auth-field { margin-bottom: 16px; }
+    .auth-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text2, #b0bac8); margin-bottom: 6px; }
+    .auth-field input {
+      width: 100%; padding: 10px 12px; border-radius: 8px;
+      border: 1px solid var(--border, #2a2d3e);
+      background: var(--bg2, #12141f); color: var(--text1, #e8edf8);
+      font-size: 14px; box-sizing: border-box; outline: none; transition: border .2s;
+    }
+    .auth-field input:focus { border-color: #F4C542; }
+    .auth-error { min-height: 18px; font-size: 12px; color: #F75757; margin-bottom: 12px; }
+    .auth-submit {
+      width: 100%; padding: 12px; border-radius: 8px; border: none;
+      background: #F4C542; color: #111; font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: background .2s;
+    }
+    .auth-submit:hover { background: #d4ac2b; }
+    .auth-submit:disabled { opacity: .6; cursor: not-allowed; }
+    /* ── USER CHIP ──────────────────────────────────────────── */
+    .user-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px;
+      background: var(--bg2, #12141f);
+      border: 1px solid var(--border, #2a2d3e);
+      font-size: 12px; font-weight: 600; color: var(--text2, #b0bac8);
+      white-space: nowrap;
+    }
+    .user-chip::before {
+      content: '👤';
+      font-size: 11px;
+    }
+    /* ── LOGOUT BUTTON ──────────────────────────────────────── */
+    .logout-btn {
+      padding: 6px 14px; border-radius: 20px;
+      border: 1px solid var(--border, #2a2d3e);
+      background: transparent; color: var(--text2, #b0bac8);
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s;
+    }
+    .logout-btn:hover { background: #F75757; color: #fff; border-color: #F75757; }
+  </style>
+  <script>(function(){ if(localStorage.getItem('btp_theme')==='light') document.body.classList.add('light-mode'); })();</script>
+</head>
+<body>
+
+<!-- ── TOP HEADER (fixed, full width) ───────────────────────── -->
+<header class="header" id="mainHeader">
+  <div class="header-left">
+    <button class="sb-toggle" id="sbToggle" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
+    <div class="logo">SAP<span>BTP</span> Mastery</div>
+  </div>
+  <div class="header-center" id="headerBreadcrumb" style="display:none">
+    <!-- filled by JS when a lesson is open -->
+  </div>
+  <div class="header-right">
+    <button class="hbtn iv-btn" onclick="showDashboard(); setTimeout(scrollToInterview,300)">🎯 Interview Prep</button>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
+    <button class="hbtn guide-btn" onclick="showGuide()" title="How to use this portal">? Guide</button>
+    <div class="progress-chip">Progress: <b id="headerProgress">0 / 20</b></div>
+    <div class="progress-chip" id="streakBadge" title="Daily login streak">🔥 1 day</div>
+    <button class="hbtn reset" onclick="resetAll()">Reset</button>
+    <span class="user-chip" id="userChip"></span>
+    <button class="logout-btn" onclick="Auth.logout()" title="Sign out">⎋ Logout</button>
+  </div>
+</header>
+
+<!-- ── APP SHELL (sidebar + main) ───────────────────────────── -->
+<div class="app-shell" id="appShell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-section-label">Course Units</div>
+    <div id="sidebarNav"></div>
+
+    <div class="sb-section-label" style="margin-top:20px">Progress</div>
+    <div class="sb-prog-wrap">
+      <div class="sb-prog-bar"><div class="sb-prog-fill" id="sbProgFill" style="width:0%"></div></div>
+      <div class="sb-prog-label"><span id="sbProgText">0 / 20 lessons</span></div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="main-content" id="mainContent">
+
+    <!-- ── VIEW: DASHBOARD (default) ────────────────────────── -->
+    <div id="viewDashboard">
+
+      <!-- Hero -->
+      <div class="hero">
+        <div class="hero-tag">BTP Foundation Course</div>
+        <h1>Master SAP <span>BTP</span><br/>Layer by Layer</h1>
+        <p id="heroSub"></p>
+      </div>
+
+      <!-- Overall progress bar -->
+      <div class="dash-section">
+        <div class="prog-box">
+          <div class="prog-label">
+            <span>Overall completion</span>
+            <span id="progPct">0%</span>
+          </div>
+          <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <!-- Project Tracker -->
+      <div class="dash-section">
+        <div class="section-heading">🔨 Project Tracker <span>— Building as you learn</span></div>
+        <div class="tracker-grid" id="trackerGrid"></div>
+      </div>
+
+      <!-- Unit Cards -->
+      <div class="dash-section">
+        <div class="section-heading">Course Units</div>
+        <div class="units-list" id="unitsContainer"></div>
+      </div>
+
+      <!-- Interview Prep -->
+      <div class="dash-section" id="interviewSection">
+        <div class="iv-header">
+          <div>
+            <div class="iv-title">Interview <span>Prep</span></div>
+            <div class="iv-subtitle">Theory · Scenarios · Architecture · Client Questions</div>
+          </div>
+          <div class="iv-stats">
+            <div class="iv-stat"><div class="iv-stat-num" id="ivTotal">20</div><div class="iv-stat-label">Questions</div></div>
+            <div class="iv-stat"><div class="iv-stat-num" id="ivPracticed" style="color:var(--accent3)">0</div><div class="iv-stat-label">Practiced</div></div>
+            <div class="iv-stat"><div class="iv-stat-num" id="ivRemaining" style="color:var(--warn)">20</div><div class="iv-stat-label">Remaining</div></div>
+          </div>
+        </div>
+        <div class="iv-filters">
+          <button class="iv-filter active"        onclick="filterQuestions('all',this)">All</button>
+          <button class="iv-filter cat-theory"    onclick="filterQuestions('theory',this)">📘 Theory</button>
+          <button class="iv-filter cat-scenario"  onclick="filterQuestions('scenario',this)">🎭 Scenarios</button>
+          <button class="iv-filter cat-arch"      onclick="filterQuestions('arch',this)">🏗 Architecture</button>
+          <button class="iv-filter cat-client"    onclick="filterQuestions('client',this)">🤝 Client</button>
+          <button class="iv-filter unprac"        onclick="filterQuestions('unprac',this)">Unpracticed only</button>
+        </div>
+        <div class="questions-grid" id="questionsGrid"></div>
+      </div>
+
+    </div><!-- /#viewDashboard -->
+
+
+    <!-- ── VIEW: LESSON (inline, full area) ─────────────────── -->
+    <div id="viewLesson" style="display:none">
+
+      <!-- Lesson top bar -->
+      <div class="lesson-topbar">
+        <button class="back-btn" onclick="showDashboard()">← Back to Units</button>
+        <div class="lesson-topbar-title" id="lessonTopTitle"></div>
+        <button class="mark-btn" id="bookmarkBtn" onclick="toggleBookmark(curLesson?.id)" style="background:var(--bg2);border:1px solid var(--border);color:var(--text2);margin-right:8px">🔖 Bookmark</button>
+        <button class="mark-btn" id="markBtn" onclick="toggleLessonDone()">Mark as Complete</button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" id="tab-learn" onclick="switchTab('learn')">📖 Learn</button>
+        <button class="tab"        id="tab-seeit" onclick="switchTab('seeit')">👁 See It</button>
+        <button class="tab"        id="tab-doit"  onclick="switchTab('doit')">🛠 Do It</button>
+        <button class="tab"        id="tab-recap" onclick="switchTab('recap')">🧠 Recap</button>
+        <button class="tab"        id="tab-notes" onclick="switchTab('notes')">📝 Notes</button>
+      </div>
+
+      <!-- Tab content panels -->
+      <div class="lesson-body">
+
+        <div class="tab-panel active" id="tp-learn">
+          <div class="learn-content" id="learnContent"></div>
+          <div class="ask-section" id="askSection" style="display:none">
+            <div class="ask-label">Ask a follow-up question</div>
+            <div class="ask-row">
+              <input class="ask-input" id="askInput" placeholder="e.g. How does this compare to Azure?"
+                     onkeydown="if(event.key==='Enter') doAskFollowup()"/>
+              <button class="ask-btn" onclick="doAskFollowup()">Ask →</button>
+            </div>
+            <div class="learn-content ask-answer" id="askAnswer" style="display:none"></div>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tp-seeit">
+          <div class="see-content learn-content" id="seeContent"></div>
+        </div>
+
+        <div class="tab-panel" id="tp-doit">
+          <div id="doContent"></div>
+        </div>
+
+        <div class="tab-panel" id="tp-recap">
+          <div class="learn-content" id="recapContent"></div>
+        </div>
+
+        <div class="tab-panel" id="tp-notes">
+          <div id="notesContent"></div>
+        </div>
+
+      </div><!-- /.lesson-body -->
+
+      <!-- Lesson bottom nav -->
+      <div class="lesson-bottombar">
+        <button class="nav-btn" id="prevBtn" onclick="navLesson(-1)">← Previous Lesson</button>
+        <div id="lessonNavLabel" style="font-size:12px;color:var(--text3)"></div>
+        <button class="nav-btn" id="nextBtn" onclick="navLesson(1)">Next Lesson →</button>
+      </div>
+
+    </div><!-- /#viewLesson -->
+
+    <!-- ── FOOTER ───────────────────────────────────────────────── -->
+    <footer class="portal-footer">
+      SAP BTP Mastery &nbsp;·&nbsp; Built for .NET/Angular developers becoming BTP architects &nbsp;·&nbsp; 2025
+    </footer>
+
+  </main><!-- /.main-content -->
+
+</div><!-- /.app-shell -->
+
+
+<!-- ── SCRIPTS ───────────────────────────────────────────────── -->
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="lessons/unit1.js"></script>
+<script src="lessons/unit2.js"></script>
+<script src="lessons/unit3.js"></script>
+<script src="lessons/unit4.js"></script>
+<script src="lessons/unit5.js"></script>
+<script src="lessons/unit6.js"></script>
+<script src="lessons/unit7.js"></script>
+<script src="lessons/unit8.js"></script>
+<script src="js/app.js"></script>
+<script src="js/protect.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .catch(err => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+
+</body>
+</html>
