@@ -125,6 +125,6 @@ app.listen(PORT, () => {
       fetch(`${RENDER_URL}/api/health`)
         .then(() => console.log('Keep-alive ping sent'))
         .catch(() => {});
-    }, 4 * 60 * 1000);
+    }, 14 * 60 * 1000);
   }
 });
