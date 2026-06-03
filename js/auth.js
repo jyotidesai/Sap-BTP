@@ -275,8 +275,58 @@ const Auth = (() => {
     }
   }
 
+  function showChangePassword() {
+    if (document.getElementById('chpw-overlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'chpw-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,12,20,.85);display:flex;align-items:center;justify-content:center';
+    overlay.innerHTML = `
+      <div style="background:var(--card-bg,#1a1d2e);border:1px solid var(--border,#2a2d3e);border-radius:16px;padding:36px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,.5)">
+        <div style="font-size:17px;font-weight:700;color:var(--text1);margin-bottom:20px">Change Password</div>
+        <div class="auth-field"><label>Current Password</label>
+          <input type="password" id="chpw-cur" placeholder="Current password" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border,#2a2d3e);background:var(--bg2,#12141f);color:var(--text1);font-size:14px;box-sizing:border-box;outline:none"/>
+        </div>
+        <div class="auth-field"><label>New Password</label>
+          <input type="password" id="chpw-new" placeholder="New password (min 6 chars)" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border,#2a2d3e);background:var(--bg2,#12141f);color:var(--text1);font-size:14px;box-sizing:border-box;outline:none"/>
+        </div>
+        <div id="chpw-error" style="min-height:18px;font-size:12px;color:#F75757;margin-bottom:12px"></div>
+        <div style="display:flex;gap:10px">
+          <button id="chpw-btn" onclick="Auth._submitChangePassword()"
+            style="flex:1;padding:11px;border-radius:8px;border:none;background:#F4C542;color:#111;font-weight:700;cursor:pointer">Update Password</button>
+          <button onclick="document.getElementById('chpw-overlay').remove()"
+            style="padding:11px 18px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+
+  async function _submitChangePassword() {
+    const cur = document.getElementById('chpw-cur')?.value;
+    const nw  = document.getElementById('chpw-new')?.value;
+    const err = document.getElementById('chpw-error');
+    const btn = document.getElementById('chpw-btn');
+    if (!cur || !nw) { if (err) err.textContent = 'Both fields are required.'; return; }
+    if (nw.length < 6) { if (err) err.textContent = 'New password must be at least 6 characters.'; return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Updating…'; }
+    try {
+      const res = await fetch(`${getApiUrl()}/api/password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+        body: JSON.stringify({ currentPassword: cur, newPassword: nw })
+      });
+      const data = await res.json();
+      if (!res.ok) { if (err) err.textContent = data.error || 'Failed.'; if (btn) { btn.disabled = false; btn.textContent = 'Update Password'; } return; }
+      document.getElementById('chpw-overlay')?.remove();
+      alert('Password updated successfully!');
+    } catch(e) {
+      if (err) err.textContent = 'Cannot reach server.';
+      if (btn) { btn.disabled = false; btn.textContent = 'Update Password'; }
+    }
+  }
+
   // Expose public API
-  return { init, logout, getUser, getToken, isAuthenticated, _switchTab, _submitLogin, _submitRegister };
+  return { init, logout, getUser, getToken, isAuthenticated, showChangePassword, _switchTab, _submitLogin, _submitRegister, _submitChangePassword };
 })();
 
 // Kick off auth check when DOM is ready

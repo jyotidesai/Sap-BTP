@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin — SAP BTP Mastery</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', system-ui, sans-serif; background: #0a0c14; color: #e8edf8; min-height: 100vh; padding: 40px 24px; }
+    h1 { font-size: 22px; font-weight: 800; color: #F4C542; margin-bottom: 8px; }
+    .subtitle { font-size: 13px; color: #8892a4; margin-bottom: 32px; }
+    .login-box { max-width: 360px; background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 14px; padding: 32px; margin-bottom: 40px; }
+    input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #2a2d3e; background: #12141f; color: #e8edf8; font-size: 14px; outline: none; margin-bottom: 12px; }
+    input:focus { border-color: #F4C542; }
+    button { padding: 11px 24px; border-radius: 8px; border: none; background: #F4C542; color: #111; font-weight: 700; cursor: pointer; font-size: 14px; }
+    button:hover { background: #d4ac2b; }
+    .error { color: #F75757; font-size: 12px; margin-bottom: 12px; min-height: 16px; }
+    table { width: 100%; border-collapse: collapse; background: #1a1d2e; border-radius: 12px; overflow: hidden; }
+    th { padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 700; color: #8892a4; letter-spacing: .5px; text-transform: uppercase; border-bottom: 1px solid #2a2d3e; }
+    td { padding: 12px 16px; font-size: 13px; color: #b0bac8; border-bottom: 1px solid #2a2d3e; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #12141f; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+    .badge-green { background: rgba(0,212,170,.15); color: #00D4AA; }
+    .badge-yellow { background: rgba(244,197,66,.15); color: #F4C542; }
+    .badge-gray { background: rgba(136,146,164,.1); color: #8892a4; }
+    .stats-row { display: flex; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
+    .stat-card { background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 12px; padding: 20px 24px; min-width: 140px; }
+    .stat-num { font-size: 28px; font-weight: 800; color: #F4C542; }
+    .stat-label { font-size: 12px; color: #8892a4; margin-top: 4px; }
+    #dashboard { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>SAP BTP Mastery — Admin</h1>
+<p class="subtitle">User management and progress overview</p>
+
+<div class="login-box" id="loginBox">
+  <div style="font-size:14px;font-weight:600;color:#e8edf8;margin-bottom:16px">Admin Login</div>
+  <input type="text" id="apiUrlInput" placeholder="API URL (e.g. http://localhost:3001)" value="http://localhost:3001"/>
+  <input type="password" id="adminPass" placeholder="Admin password" onkeydown="if(event.key==='Enter')loadUsers()"/>
+  <div class="error" id="loginError"></div>
+  <button onclick="loadUsers()">Load Users →</button>
+</div>
+
+<div id="dashboard">
+  <div class="stats-row" id="statsRow"></div>
+  <table id="usersTable">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Joined</th>
+        <th>Last Login</th>
+        <th>Streak</th>
+        <th>Progress</th>
+        <th>Study Time</th>
+        <th>Bookmarks</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody id="usersBody"></tbody>
+  </table>
+  <div style="margin-top:16px">
+    <button onclick="loadUsers()" style="background:#2a2d3e;color:#b0bac8;border:1px solid #2a2d3e">↻ Refresh</button>
+  </div>
+</div>
+
+<script>
+  async function loadUsers() {
+    const apiUrl = document.getElementById('apiUrlInput').value.trim();
+    const pass   = document.getElementById('adminPass').value;
+    const err    = document.getElementById('loginError');
+    err.textContent = '';
+    try {
+      const res = await fetch(`${apiUrl}/api/admin/users`, {
+        headers: { 'x-admin-password': pass }
+      });
+      const data = await res.json();
+      if (!res.ok) { err.textContent = data.error || 'Failed.'; return; }
+      document.getElementById('loginBox').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      renderDashboard(data.users);
+    } catch(e) {
+      err.textContent = 'Cannot reach server. Check URL.';
+    }
+  }
+
+  function renderDashboard(users) {
+    const totalUsers = users.length;
+    const avgProgress = users.length ? Math.round(users.reduce((a,u) => a + u.progressPct, 0) / users.length) : 0;
+    const totalMinutes = users.reduce((a,u) => a + u.totalMinutes, 0);
+    const completed = users.filter(u => u.progressPct === 100).length;
+
+    document.getElementById('statsRow').innerHTML = `
+      <div class="stat-card"><div class="stat-num">${totalUsers}</div><div class="stat-label">Total Users</div></div>
+      <div class="stat-card"><div class="stat-num">${avgProgress}%</div><div class="stat-label">Avg Progress</div></div>
+      <div class="stat-card"><div class="stat-num">${completed}</div><div class="stat-label">Completed Course</div></div>
+      <div class="stat-card"><div class="stat-num">${totalMinutes}m</div><div class="stat-label">Total Study Time</div></div>`;
+
+    document.getElementById('usersBody').innerHTML = users.map(u => `
+      <tr>
+        <td style="color:#e8edf8;font-weight:600">${u.name}</td>
+        <td>${u.email}</td>
+        <td>${u.createdAt ? u.createdAt.slice(0,10) : '—'}</td>
+        <td>${u.lastLoginDate || '—'}</td>
+        <td>${u.streak > 0 ? `<span class="badge badge-yellow">🔥 ${u.streak}d</span>` : '—'}</td>
+        <td>
+          <span class="badge ${u.progressPct === 100 ? 'badge-green' : u.progressPct > 0 ? 'badge-yellow' : 'badge-gray'}">
+            ${u.progressPct}% (${u.lessonsCompleted}/25)
+          </span>
+        </td>
+        <td>${u.totalMinutes > 0 ? u.totalMinutes + 'm' : '—'}</td>
+        <td>${u.bookmarks || 0}</td>
+        <td>${u.notes || 0}</td>
+      </tr>`).join('');
+  }
+</script>
+</body>
+</html>

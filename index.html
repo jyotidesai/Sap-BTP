@@ -103,10 +103,13 @@
     <button class="hbtn iv-btn" onclick="showDashboard(); setTimeout(scrollToInterview,300)">🎯 Interview Prep</button>
     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
     <button class="hbtn guide-btn" onclick="showGuide()" title="How to use this portal">? Guide</button>
+    <button class="hbtn" onclick="openSearch()" title="Search lessons">🔍 Search</button>
     <div class="progress-chip">Progress: <b id="headerProgress">0 / 20</b></div>
     <div class="progress-chip" id="streakBadge" title="Daily login streak">🔥 1 day</div>
+    <div class="progress-chip" id="studyTimeBadge" title="Total study time">⏱ 0m</div>
     <button class="hbtn reset" onclick="resetAll()">Reset</button>
     <span class="user-chip" id="userChip"></span>
+    <button class="logout-btn" onclick="Auth.showChangePassword()" title="Change password" style="margin-right:4px">🔑</button>
     <button class="logout-btn" onclick="Auth.logout()" title="Sign out">⎋ Logout</button>
   </div>
 </header>
@@ -138,6 +141,9 @@
         <h1>Master SAP <span>BTP</span><br/>Layer by Layer</h1>
         <p id="heroSub"></p>
       </div>
+
+      <!-- Continue banner -->
+      <div id="continueBanner" style="display:none;align-items:center;gap:16px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin:0 0 16px"></div>
 
       <!-- Overall progress bar -->
       <div class="dash-section">
@@ -176,6 +182,7 @@
           </div>
         </div>
         <div class="iv-filters">
+          <button id="quizModeBtn" class="iv-filter" onclick="toggleQuizMode()" style="margin-left:auto">🧠 Quiz Mode</button>
           <button class="iv-filter active"        onclick="filterQuestions('all',this)">All</button>
           <button class="iv-filter cat-theory"    onclick="filterQuestions('theory',this)">📘 Theory</button>
           <button class="iv-filter cat-scenario"  onclick="filterQuestions('scenario',this)">🎭 Scenarios</button>

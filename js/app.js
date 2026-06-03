@@ -10,7 +10,10 @@ let doChecks   = {};
 let practicedQ = {};
 let bookmarks  = [];
 let notes      = {};
+let timeSpent  = {};
 let streak     = 1;
+let lessonOpenTime = null;
+let quizMode   = false;
 
 let curUnitIdx   = 0;
 let curLessonIdx = 0;
@@ -25,6 +28,7 @@ function loadState() {
   try { practicedQ = JSON.parse(localStorage.getItem('btp_practiced') || '{}'); } catch(e) { practicedQ = {}; }
   try { bookmarks  = JSON.parse(localStorage.getItem('btp_bookmarks') || '[]'); } catch(e) { bookmarks = []; }
   try { notes      = JSON.parse(localStorage.getItem('btp_notes')     || '{}'); } catch(e) { notes = {}; }
+  try { timeSpent  = JSON.parse(localStorage.getItem('btp_timespent') || '{}'); } catch(e) { timeSpent = {}; }
   if (progress['u2l2'] === undefined) progress['u2l2'] = true;
   const btn = document.getElementById('themeToggle');
   if (btn) btn.textContent = localStorage.getItem('btp_theme') === 'light' ? '☀️' : '🌙';
@@ -49,10 +53,11 @@ function getApiUrl() {
 function syncProgressToServer() {
   const token = typeof Auth !== 'undefined' ? Auth.getToken() : null;
   if (!token) return;
+  const theme = localStorage.getItem('btp_theme') || 'dark';
   fetch(`${getApiUrl()}/api/progress`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ progress, doChecks, practicedQ, bookmarks, notes })
+    body: JSON.stringify({ progress, doChecks, practicedQ, bookmarks, notes, timeSpent, theme })
   }).catch(() => {});
 }
 
@@ -70,10 +75,13 @@ async function loadProgressFromServer() {
     if (data.practicedQ) { practicedQ = data.practicedQ; localStorage.setItem('btp_practiced', JSON.stringify(practicedQ)); }
     if (data.bookmarks)  { bookmarks  = data.bookmarks;  localStorage.setItem('btp_bookmarks', JSON.stringify(bookmarks)); }
     if (data.notes)      { notes      = data.notes;      localStorage.setItem('btp_notes',     JSON.stringify(notes)); }
+    if (data.timeSpent)  { timeSpent  = data.timeSpent;  localStorage.setItem('btp_timespent', JSON.stringify(timeSpent)); }
     if (data.streak)     { streak     = data.streak; }
+    if (data.theme)      { localStorage.setItem('btp_theme', data.theme); applyTheme(data.theme); }
     render();
     renderInterviewSection();
     renderStreakBadge();
+    renderStudyTime();
   } catch(e) {}
 }
 
@@ -85,6 +93,46 @@ function saveBookmarks() {
 function saveNotes() {
   localStorage.setItem('btp_notes', JSON.stringify(notes));
   syncProgressToServer();
+}
+
+function saveTimeSpent() {
+  localStorage.setItem('btp_timespent', JSON.stringify(timeSpent));
+  syncProgressToServer();
+}
+
+function startLessonTimer() {
+  lessonOpenTime = Date.now();
+}
+
+function stopLessonTimer() {
+  if (!lessonOpenTime || !curLesson) return;
+  const seconds = Math.round((Date.now() - lessonOpenTime) / 1000);
+  timeSpent[curLesson.id] = (timeSpent[curLesson.id] || 0) + seconds;
+  lessonOpenTime = null;
+  saveTimeSpent();
+  renderStudyTime();
+}
+
+function totalStudyMinutes() {
+  return Math.round(Object.values(timeSpent).reduce((a, b) => a + b, 0) / 60);
+}
+
+function renderStudyTime() {
+  const el = document.getElementById('studyTimeBadge');
+  const mins = totalStudyMinutes();
+  if (el) el.textContent = mins >= 60
+    ? `⏱ ${Math.floor(mins/60)}h ${mins % 60}m`
+    : `⏱ ${mins}m`;
+}
+
+function applyTheme(theme) {
+  if (theme === 'light') {
+    document.body.classList.add('light-mode');
+  } else {
+    document.body.classList.remove('light-mode');
+  }
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = theme === 'light' ? '☀️' : '🌙';
 }
 
 function toggleBookmark(lessonId) {
@@ -153,13 +201,16 @@ function toggleSidebar() {
 /* ── THEME TOGGLE ────────────────────────────────────────────── */
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light-mode');
-  localStorage.setItem('btp_theme', isLight ? 'light' : 'dark');
+  const theme = isLight ? 'light' : 'dark';
+  localStorage.setItem('btp_theme', theme);
   const btn = document.getElementById('themeToggle');
   if (btn) btn.textContent = isLight ? '☀️' : '🌙';
+  syncProgressToServer();
 }
 
 /* ── VIEW SWITCHING ──────────────────────────────────────────── */
 function showDashboard() {
+  stopLessonTimer();
   const dash   = document.getElementById('viewDashboard');
   const lesson = document.getElementById('viewLesson');
   lesson.style.display = 'none';
@@ -194,6 +245,7 @@ function render() {
   renderTracker();
   renderSidebar();
   renderUnits();
+  renderContinueBanner();
   const heroSub = document.getElementById('heroSub');
   if (heroSub) heroSub.textContent = CONFIG.heroSub;
 }
@@ -380,6 +432,8 @@ function openLesson(unitIdx, lessonIdx) {
   const navLabel = document.getElementById('lessonNavLabel');
   if (navLabel) navLabel.textContent = `Lesson ${curIdx + 1} of ${lessons.length}`;
 
+  stopLessonTimer();
+  startLessonTimer();
   showLesson();
   updateMarkButton();
   updateBookmarkButton();
@@ -430,6 +484,8 @@ function toggleLessonDone() {
       void btn.offsetWidth;
       btn.classList.add('celebrate');
     }
+    const { done, total } = totalProgress();
+    if (done === total) setTimeout(showCertificate, 600);
   }
 }
 
@@ -572,6 +628,25 @@ function renderQuestions() {
 
   el.innerHTML = qs.map(q => {
     const prac = !!practicedQ[q.id];
+    if (quizMode) {
+      return `
+        <div class="question-card cat-${q.category}" style="cursor:default">
+          <div class="qcard-top">
+            <div class="qcard-meta">
+              <span class="qcat-badge">${catLabel[q.category]}</span>
+              <span class="qlevel ${lvlClass[q.level]}">${lvlLabel[q.level]}</span>
+            </div>
+            <div class="qcard-question">${q.question}</div>
+          </div>
+          <div class="qcard-footer">
+            <button class="reveal-btn" id="rb-${q.id}" onclick="toggleAnswer('${q.id}')">Reveal Answer</button>
+            <button class="practiced-btn" onclick="togglePracticed('${q.id}')">${prac ? '✓ Got it' : 'Got it!'}</button>
+          </div>
+          <div class="qcard-answer" id="qa-${q.id}">
+            <div class="answer-content">${q.answer}</div>
+          </div>
+        </div>`;
+    }
     return `
       <div class="question-card cat-${q.category} ${prac ? 'practiced' : ''}">
         <div class="qcard-top">
@@ -620,6 +695,123 @@ function togglePracticed(qid) {
   practicedQ[qid] = !practicedQ[qid];
   savePracticed();
   renderInterviewSection();
+}
+
+/* ── CONTINUE BANNER ─────────────────────────────────────────── */
+function renderContinueBanner() {
+  const el = document.getElementById('continueBanner');
+  if (!el) return;
+  try {
+    const last = JSON.parse(localStorage.getItem('btp_last_lesson'));
+    if (!last || !ALL_UNITS[last.unitIdx]) { el.style.display = 'none'; return; }
+    const unit   = ALL_UNITS[last.unitIdx];
+    const lesson = unit.lessons[last.lessonIdx];
+    if (!lesson) { el.style.display = 'none'; return; }
+    const spent = timeSpent[lesson.id] ? `· ${Math.round(timeSpent[lesson.id]/60)}m spent` : '';
+    el.style.display = 'flex';
+    el.innerHTML = `
+      <div style="flex:1">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:2px">Continue where you left off</div>
+        <div style="font-weight:600;color:var(--text1)">${lesson.title}</div>
+        <div style="font-size:12px;color:var(--text3)">Unit ${unit.id}: ${unit.title} ${spent}</div>
+      </div>
+      <button onclick="openLesson(${last.unitIdx},${last.lessonIdx})"
+        style="padding:8px 18px;border-radius:8px;border:none;background:var(--accent);color:#111;font-weight:700;cursor:pointer">
+        Resume →
+      </button>`;
+  } catch(e) { el.style.display = 'none'; }
+}
+
+/* ── SEARCH ──────────────────────────────────────────────────── */
+function openSearch() {
+  if (document.getElementById('search-overlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'search-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(10,12,20,.85);display:flex;align-items:flex-start;justify-content:center;padding-top:80px';
+  overlay.innerHTML = `
+    <div style="width:100%;max-width:600px;background:var(--card-bg);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.5)">
+      <div style="display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)">
+        <span style="font-size:18px;margin-right:10px">🔍</span>
+        <input id="searchInput" placeholder="Search lessons and interview questions…"
+          style="flex:1;background:none;border:none;outline:none;color:var(--text1);font-size:15px"
+          oninput="doSearch(this.value)" autofocus/>
+        <button onclick="closeSearch()" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer">✕</button>
+      </div>
+      <div id="searchResults" style="max-height:420px;overflow-y:auto;padding:8px 0"></div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeSearch(); });
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('searchInput')?.focus(), 50);
+}
+
+function closeSearch() {
+  const el = document.getElementById('search-overlay');
+  if (el) el.remove();
+}
+
+function doSearch(query) {
+  const el = document.getElementById('searchResults');
+  if (!el) return;
+  query = query.trim().toLowerCase();
+  if (!query) { el.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:13px">Start typing to search…</div>'; return; }
+
+  const results = [];
+  allLessons().forEach(l => {
+    const text = (l.title + ' ' + (l.learn || '') + ' ' + (l.recap || '')).toLowerCase();
+    if (text.includes(query)) {
+      results.push({ type: 'lesson', label: l.title, sub: `Unit ${ALL_UNITS[l.unitIdx].id}: ${ALL_UNITS[l.unitIdx].title}`, unitIdx: l.unitIdx, lessonIdx: l.lessonIdx });
+    }
+  });
+  INTERVIEW_QUESTIONS.forEach(q => {
+    if (q.question.toLowerCase().includes(query) || (q.hint||'').toLowerCase().includes(query)) {
+      results.push({ type: 'question', label: q.question, sub: `Interview Prep · ${q.category}` });
+    }
+  });
+
+  if (!results.length) { el.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:13px">No results found.</div>'; return; }
+
+  el.innerHTML = results.slice(0, 12).map(r => `
+    <div onclick="${r.type === 'lesson' ? `closeSearch();openLesson(${r.unitIdx},${r.lessonIdx})` : `closeSearch();showDashboard();setTimeout(scrollToInterview,300)`}"
+      style="padding:12px 18px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .15s"
+      onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+      <div style="font-size:13px;font-weight:600;color:var(--text1)">${r.type === 'lesson' ? '📖' : '🎯'} ${r.label}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">${r.sub}</div>
+    </div>`).join('');
+}
+
+/* ── CERTIFICATE ─────────────────────────────────────────────── */
+function showCertificate() {
+  if (document.getElementById('cert-overlay')) return;
+  const userName = localStorage.getItem('btp_user_name') || 'Student';
+  const date = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+  const overlay = document.createElement('div');
+  overlay.id = 'cert-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(10,12,20,.92);display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = `
+    <div id="certCard" style="background:linear-gradient(135deg,#1a1d2e,#12141f);border:2px solid #F4C542;border-radius:20px;padding:48px 40px;max-width:580px;width:100%;text-align:center;box-shadow:0 0 60px rgba(244,197,66,.2)">
+      <div style="font-size:48px;margin-bottom:12px">🏆</div>
+      <div style="font-size:12px;letter-spacing:3px;color:#F4C542;font-weight:700;margin-bottom:16px">CERTIFICATE OF COMPLETION</div>
+      <div style="font-size:14px;color:var(--text3);margin-bottom:8px">This certifies that</div>
+      <div style="font-size:28px;font-weight:800;color:#F4C542;font-family:'Syne',sans-serif;margin-bottom:8px">${userName}</div>
+      <div style="font-size:14px;color:var(--text3);margin-bottom:4px">has successfully completed</div>
+      <div style="font-size:20px;font-weight:700;color:var(--text1);margin-bottom:4px">SAP BTP Mastery</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:24px">8 Units · 25 Lessons · BTP Technical Architect Track</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:32px">${date}</div>
+      <div style="display:flex;gap:12px;justify-content:center">
+        <button onclick="window.print()" style="padding:10px 24px;border-radius:8px;border:none;background:#F4C542;color:#111;font-weight:700;cursor:pointer">🖨 Print</button>
+        <button onclick="document.getElementById('cert-overlay').remove()" style="padding:10px 24px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer">Close</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+/* ── QUIZ MODE ───────────────────────────────────────────────── */
+function toggleQuizMode() {
+  quizMode = !quizMode;
+  const btn = document.getElementById('quizModeBtn');
+  if (btn) { btn.textContent = quizMode ? '🧠 Exit Quiz' : '🧠 Quiz Mode'; btn.classList.toggle('active', quizMode); }
+  renderQuestions();
 }
 
 /* ── GUIDE ───────────────────────────────────────────────────── */
@@ -793,10 +985,13 @@ function renderGuideStep() {
 /* ── KEYBOARD ────────────────────────────────────────────────── */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (document.getElementById('guide-overlay')) { hideGuide(); return; }
+    if (document.getElementById('search-overlay')) { closeSearch(); return; }
+    if (document.getElementById('guide-overlay'))  { hideGuide(); return; }
     showDashboard();
   }
 });
+
+window.addEventListener('beforeunload', () => stopLessonTimer());
 
 /* ── INIT ────────────────────────────────────────────────────── */
 // Called by auth.js after successful login/token verification
@@ -805,6 +1000,7 @@ window.initApp = function(userName) {
   render();
   renderInterviewSection();
   renderStreakBadge();
+  renderStudyTime();
   loadProgressFromServer();
   if (!localStorage.getItem('btp_guide_seen')) {
     setTimeout(() => showGuide(true), 800);
