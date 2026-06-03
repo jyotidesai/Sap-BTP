@@ -109,6 +109,41 @@ app.get('/api/verify', (req, res) => {
   }
 });
 
+// GET /api/progress — load progress for logged-in user
+app.get('/api/progress', (req, res) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'No token.' });
+  try {
+    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    const users = readUsers();
+    const user = users.find(u => u.id === decoded.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    res.json({ progress: user.progress || {}, doChecks: user.doChecks || {}, practicedQ: user.practicedQ || {} });
+  } catch (e) {
+    res.status(401).json({ error: 'Invalid token.' });
+  }
+});
+
+// POST /api/progress — save progress for logged-in user
+app.post('/api/progress', (req, res) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'No token.' });
+  try {
+    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    const users = readUsers();
+    const user = users.find(u => u.id === decoded.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const { progress, doChecks, practicedQ } = req.body;
+    if (progress  !== undefined) user.progress   = progress;
+    if (doChecks  !== undefined) user.doChecks   = doChecks;
+    if (practicedQ !== undefined) user.practicedQ = practicedQ;
+    writeUsers(users);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(401).json({ error: 'Invalid token.' });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'SAP BTP Portal API is running.' });
